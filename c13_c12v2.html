@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photosynthetic 13C vs 12C Discrimination Explorer</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary: #15803d;
+            --secondary: #0369a1;
+            --accent-12c: #3b82f6;
+            --accent-13c: #ef4444;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+
+        .slider-val {
+            float: right;
+            color: var(--secondary);
+            font-weight: bold;
+        }
+
+        input[type=range] {
+            width: 100%;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        canvas {
+            width: 100%;
+            height: 340px;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .metric-box {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-val {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .metric-lbl {
+            font-size: 0.7rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Carbon Isotope Discrimination Model</h1>
+    <div class="subtitle">Interactive Micro-environmental Simulation of Stomatal Aperture & Isotope Selection</div>
+
+    <div class="grid">
+        <!-- Controls -->
+        <div class="card">
+            <h3>Parameters</h3>
+
+            <div class="control-group">
+                <label>Photosynthetic Pathway</label>
+                <select id="pathwaySelect" onchange="updateSimulation()">
+                    <option value="C3">C3 Plant (Rubisco primary)</option>
+                    <option value="C4">C4 Plant (PEPC primary)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="cicaSlider">
+                    Cᵢ / Cₐ Ratio (Stomatal Openness)
+                    <span class="slider-val" id="cicaVal">0.70</span>
+                </label>
+                <input type="range" id="cicaSlider" min="0.10" max="0.95" step="0.01" value="0.70" oninput="updateSimulation()">
+            </div>
+
+            <div class="control-group">
+                <label for="rubiscoSlider">
+                    Rubisco Discrimination b (‰)
+                    <span class="slider-val" id="rubiscoVal">27.0</span>
+                </label>
+                <input type="range" id="rubiscoSlider" min="20.0" max="30.0" step="0.5" value="27.0" oninput="updateSimulation()">
+            </div>
+
+            <div class="control-group">
+                <label for="airDeltaSlider">
+                    Atmospheric δ¹³C (‰)
+                    <span class="slider-val" id="airDeltaVal">-8.0</span>
+                </label>
+                <input type="range" id="airDeltaSlider" min="-12.0" max="-6.0" step="0.1" value="-8.0" oninput="updateSimulation()">
+            </div>
+
+            <div class="metric-box" style="margin-top: 16px;">
+                <div class="metric-lbl">Physiological Status</div>
+                <div id="envContext" style="font-size: 0.85rem; margin-top: 4px; font-weight: 600; color: #334155;">
+                    Normal Stomatal Conductance
+                </div>
+            </div>
+        </div>
+
+        <!-- Simulation Display -->
+        <div class="card">
+            <h3>Leaf Cross-Section & Stomatal Aperture</h3>
+            <canvas id="simCanvas"></canvas>
+
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background: var(--accent-12c);"></div> ¹²CO₂</div>
+                <div class="legend-item"><div class="dot" style="background: var(--accent-13c);"></div> ¹³CO₂</div>
+                <div class="legend-item"><div class="dot" style="background: #22c55e;"></div> Fixed Biomass</div>
+                <div class="legend-item"><div class="dot" style="background: #94a3b8;"></div> Bounced (Blocked)</div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="metric-lbl">Stomatal Aperture</div>
+                    <div class="metric-val" id="apertureVal">70%</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Discrimination (Δ)</div>
+                    <div class="metric-val" id="deltaVal">20.2 ‰</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Plant δ¹³C</div>
+                    <div class="metric-val" id="plantDeltaVal">-28.2 ‰</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Inflow Flux</div>
+                    <div class="metric-val" id="fluxVal">High</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function setupCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    setupCanvas();
+
+    let particles = [];
+    const NUM_PARTICLES = 140;
+
+    class Molecule {
+        constructor() {
+            this.reset(true);
+        }
+
+        reset(initial = false) {
+            const w = canvas.clientWidth;
+            this.x = Math.random() * (w - 20) + 10;
+            this.y = initial ? Math.random() * 80 + 10 : Math.random() * 40 + 5;
+            this.vx = (Math.random() - 0.5) * 1.5;
+            this.vy = Math.random() * 1.2 + 0.8;
+            this.is13C = Math.random() < 0.20; // 20% visual ratio for visual clarity
+            this.radius = this.is13C ? 4.5 : 3.5;
+            this.state = 'air'; // air, mesophyll, fixed
+            this.fixedTimer = 0;
+        }
+
+        update(cica, pathway, rubiscoDisc) {
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            const epiY = 100; // Epidermis position
+            const epiHeight = 24;
+
+            // Stomatal aperture width depends directly on Ci/Ca slider
+            const maxPoreWidth = w * 0.65;
+            const minPoreWidth = w * 0.06;
+            const poreWidth = minPoreWidth + (maxPoreWidth - minPoreWidth) * cica;
+            const poreLeft = (w - poreWidth) / 2;
+            const poreRight = (w + poreWidth) / 2;
+
+            if (this.state === 'air') {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off side walls
+                if (this.x < 10 || this.x > w - 10) this.vx *= -1;
+
+                // Check collision with epidermis layer
+                if (this.y + this.radius >= epiY && this.y - this.radius <= epiY + epiHeight) {
+                    if (this.x >= poreLeft && this.x <= poreRight) {
+                        // Pass through open stoma into mesophyll
+                        this.state = 'mesophyll';
+                    } else {
+                        // Blocked by guard cells / cuticle -> bounce back!
+                        this.vy = -Math.abs(this.vy);
+                        this.y = epiY - this.radius - 1;
+                    }
+                }
+
+                if (this.y < 5) this.vy = Math.abs(this.vy);
+
+            } else if (this.state === 'mesophyll') {
+                this.x += this.vx + (Math.random() - 0.5) * 0.8;
+                this.y += this.vy;
+
+                // Bounce off side walls inside mesophyll
+                if (this.x < 10 || this.x > w - 10) this.vx *= -1;
+
+                // Bounce back up if hitting bottom
+                if (this.y > h - 15) {
+                    this.vy = -Math.abs(this.vy);
+                }
+
+                // If moving upwards and hits stoma opening, can diffuse BACK OUT if Ci is high!
+                if (this.y <= epiY + epiHeight && this.vy < 0) {
+                    if (this.x >= poreLeft && this.x <= poreRight) {
+                        this.state = 'air';
+                    } else {
+                        this.vy = Math.abs(this.vy);
+                    }
+                }
+
+                // Fixation probability depends on Ci/Ca and Isotope
+                // Under low Ci/Ca (low CO2 supply), Rubisco fixes almost everything (low discrimination expression)
+                // Under high Ci/Ca (abundant CO2), Rubisco selectively fixes 12C and rejects 13C
+                let baseFixProb = 0.012 + (1 - cica) * 0.035; // Lower Ci/Ca = higher demand / draw-down
+
+                if (pathway === 'C3') {
+                    if (this.is13C) {
+                        // Discrimination factor is strongly expressed when Ci/Ca is high
+                        const discFactor = (rubiscoDisc / 1000) * cica;
+                        baseFixProb *= (1 - discFactor);
+                    }
+                } else {
+                    // C4 pathway has minimal PEPC discrimination
+                    if (this.is13C) baseFixProb *= 0.985;
+                }
+
+                if (Math.random() < baseFixProb) {
+                    this.state = 'fixed';
+                    this.fixedTimer = 60; // Stay green for 60 frames then reset
+                }
+
+            } else if (this.state === 'fixed') {
+                this.fixedTimer--;
+                if (this.fixedTimer <= 0) {
+                    this.reset();
+                }
+            }
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            if (this.state === 'fixed') {
+                ctx.fillStyle = '#22c55e'; // Green when fixed into sugars
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = 6;
+            } else {
+                ctx.fillStyle = this.is13C ? '#ef4444' : '#3b82f6';
+                ctx.shadowBlur = 0;
+            }
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    // Initialize particle pool
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+        particles.push(new Molecule());
+    }
+
+    function calculateIsotopes() {
+        const pathway = document.getElementById('pathwaySelect').value;
+        const cica = parseFloat(document.getElementById('cicaSlider').value);
+        const b = parseFloat(document.getElementById('rubiscoSlider').value);
+        const airDelta = parseFloat(document.getElementById('airDeltaSlider').value);
+
+        const a = 4.4; // Diffusion fractionation
+        let BigDelta = 0;
+
+        if (pathway === 'C3') {
+            BigDelta = a + (b - a) * cica;
+        } else {
+            const b4 = -5.7;
+            const phi = 0.25;
+            BigDelta = a + (b4 + b * phi - a) * cica;
+        }
+
+        const plantDelta = airDelta - BigDelta;
+        return { BigDelta, plantDelta, cica };
+    }
+
+    function updateSimulation() {
+        const { BigDelta, plantDelta, cica } = calculateIsotopes();
+
+        document.getElementById('cicaVal').innerText = cica.toFixed(2);
+        document.getElementById('rubiscoVal').innerText = parseFloat(document.getElementById('rubiscoSlider').value).toFixed(1);
+        document.getElementById('airDeltaVal').innerText = parseFloat(document.getElementById('airDeltaSlider').value).toFixed(1);
+
+        document.getElementById('deltaVal').innerText = BigDelta.toFixed(1) + ' ‰';
+        document.getElementById('plantDeltaVal').innerText = plantDelta.toFixed(1) + ' ‰';
+        document.getElementById('apertureVal').innerText = Math.round(cica * 100) + '%';
+
+        const envBox = document.getElementById('envContext');
+        const fluxBox = document.getElementById('fluxVal');
+
+        if (cica < 0.35) {
+            envBox.innerText = 'Severe Drought / Stomatal Restriction';
+            envBox.style.color = '#dc2626';
+            fluxBox.innerText = 'Restricted';
+            fluxBox.style.color = '#dc2626';
+        } else if (cica > 0.75) {
+            envBox.innerText = 'High Humidity / Open Stomata';
+            envBox.style.color = '#0284c7';
+            fluxBox.innerText = 'High';
+            fluxBox.style.color = '#0284c7';
+        } else {
+            envBox.innerText = 'Normal Stomatal Conductance';
+            envBox.style.color = '#15803d';
+            fluxBox.innerText = 'Moderate';
+            fluxBox.style.color = '#15803d';
+        }
+    }
+
+    function drawLeafAnatomy(cica) {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        const epiY = 100;
+        const epiHeight = 24;
+
+        // 1. Atmosphere Background
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, w, epiY);
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('ATMOSPHERE (Ambient CO₂ Pool)', 12, 20);
+
+        // 2. Dynamic Guard Cells & Epidermis
+        const maxPoreWidth = w * 0.65;
+        const minPoreWidth = w * 0.06;
+        const poreWidth = minPoreWidth + (maxPoreWidth - minPoreWidth) * cica;
+        const poreLeft = (w - poreWidth) / 2;
+        const poreRight = (w + poreWidth) / 2;
+
+        // Left Epidermal Leaf Tissue
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(0, epiY, poreLeft, epiHeight);
+        // Right Epidermal Leaf Tissue
+        ctx.fillRect(poreRight, epiY, w - poreRight, epiHeight);
+
+        // Guard Cells (Rounded caps on edges of pore)
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(poreLeft, epiY + epiHeight / 2, epiHeight / 2, 0, Math.PI * 2);
+        ctx.arc(poreRight, epiY + epiHeight / 2, epiHeight / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stomatal Aperture Label
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '11px sans-serif';
+        const labelText = `STOMATAL PORE (${Math.round(cica * 100)}% Open)`;
+        const labelWidth = ctx.measureText(labelText).width;
+        if (poreWidth > labelWidth + 20) {
+            ctx.fillText(labelText, (w - labelWidth) / 2, epiY + 16);
+        } else {
+            ctx.fillText('PORE', (w - 30) / 2, epiY + 16);
+        }
+
+        // 3. Mesophyll Internal Cavity
+        ctx.fillStyle = '#091e11';
+        ctx.fillRect(0, epiY + epiHeight, w, h - (epiY + epiHeight));
+        ctx.fillStyle = '#22c55e';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('SUB-STOMATAL CAVITY & MESOPHYLL (Carboxylation Site)', 12, epiY + epiHeight + 20);
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+        const pathway = document.getElementById('pathwaySelect').value;
+        const cica = parseFloat(document.getElementById('cicaSlider').value);
+        const b = parseFloat(document.getElementById('rubiscoSlider').value);
+
+        drawLeafAnatomy(cica);
+
+        particles.forEach(p => {
+            p.update(cica, pathway, b);
+            p.draw();
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    updateSimulation();
+    animate();
+</script>
+
+</body>
+</html>
